@@ -3,27 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone Camera Scanner</title>
+    <title>Phone Scanner</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background: #111;
-            color: #fff;
+            color: white;
             text-align: center;
-            padding: 30px;
+            padding: 40px;
         }
-        .scanner-box {
+        .box {
             background: #222;
-            padding: 25px;
+            padding: 30px;
             border-radius: 12px;
             max-width: 400px;
             margin: 0 auto;
-            box-shadow: 0 4px 15px rgba(0,255,0,0.2);
         }
         input[type="file"] {
             display: none;
         }
-        .camera-btn {
+        .scan-btn {
             background: #28a745;
             color: white;
             padding: 15px 25px;
@@ -34,10 +33,10 @@
             display: inline-block;
             margin-top: 15px;
             font-weight: bold;
+            width: 100%;
+            box-sizing: border-box;
         }
-        .camera-btn:hover {
-            background: #218838;
-        }
+        .scan-btn:hover { background: #218838; }
         #preview {
             width: 100%;
             max-height: 250px;
@@ -45,57 +44,128 @@
             margin-top: 15px;
             border-radius: 6px;
             border: 2px dashed #444;
+            display: none;
         }
-        .status {
-            margin-top: 15px;
+        /* Popup Modal for Cashier Request */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+        }
+        .modal-content {
+            background: #222;
+            color: white;
+            margin: 25% auto;
+            padding: 25px;
+            width: 80%;
+            max-width: 350px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #ffc107;
+        }
+        .modal-content button {
+            padding: 10px 20px;
             font-size: 16px;
-            color: #ffc107;
+            margin: 10px 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-<div class="scanner-box">
-    <h2>📷 Phone Item Scanner</h2>
-    <p>Snap a photo of any item to send it instantly to the computer!</p>
+<div class="box">
+    <h2>📱 Phone Scanner</h2>
+    <p id="instructionText">Waiting for cashier signal...</p>
 
-    <!-- Hidden file input triggered by camera capture -->
-    <label class="camera-btn">
+    <!-- Hidden file input triggered when cashier clicks Add Item -->
+    <label class="scan-btn" id="snapBtn" style="display:none;">
         📸 Snap Product Photo
         <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleImage(event)">
     </label>
 
-    <br>
-    <img id="preview" src="" alt="Scanned item preview will appear here">
-    <div class="status" id="statusText">Ready to scan...</div>
+    <img id="preview" alt="Scanned preview">
+    <div id="statusText" style="margin-top: 15px; color: #ffc107;"></div>
+</div>
+
+<!-- Cashier Add Request Modal -->
+<div class="modal" id="addRequestModal">
+    <div class="modal-content">
+        <h3>🔔 Cashier Request</h3>
+        <p>Cashier wants to add an item. Do you want to take a picture?</p>
+        <button class="success" onclick="acceptAddRequest()">Yes</button>
+        <button class="danger" onclick="closeModal()">No</button>
+    </div>
 </div>
 
 <script>
+    let lastActionTimestamp = localStorage.getItem('phoneLastAction') || 0;
+    let capturedImageData = "";
+
+    // Watch for signals from the laptop cashier
+    setInterval(() => {
+        let phoneActionStr = localStorage.getItem('phoneAction');
+        if (!phoneActionStr) return;
+
+        let phoneAction = JSON.parse(phoneActionStr);
+        if (phoneAction.action === 'add_request' && phoneAction.timestamp > lastActionTimestamp) {
+            lastActionTimestamp = phoneAction.timestamp;
+            localStorage.setItem('phoneLastAction', lastActionTimestamp);
+            
+            // Show popup on phone
+            document.getElementById('addRequestModal').style.display = 'block';
+        }
+    }, 500);
+
+    function acceptAddRequest() {
+        document.getElementById('addRequestModal').style.display = 'none';
+        document.getElementById('instructionTextinnerText') = "Tap below to snap a picture of the item:";
+        document.getElementById('snapBtn').style.display = 'inline-block';
+        document.getElementById('instructionText').innerText = "Snap a photo of the item:";
+    }
+
+    function closeModal() {
+        document.getElementById('addRequestModal').style.display = 'none';
+    }
+
     function handleImage(event) {
         const file = event.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            const imageData = e.target.result; // Base64 image string
+            capturedImageData = e.target.result;
 
-            // Display preview on phone
-            document.getElementById('preview').src = imageData;
+            // Show preview on phone
+            const preview = document.getElementById('preview');
+            preview.src = capturedImageData;
+            preview.style.display = 'block';
 
-            // Create a scanned item package
-            const scannedItem = {
+            // Send to computer via incomingScans
+            let incomingScans = JSON.parse(localStorage.getItem('incomingScans')) || [];
+            incomingScans.push({
                 id: Date.now(),
-                name: "Scanned Item #" + Math.floor(Math.random() * 1000),
-                price: 2.99, // Default price or you can prompt for price
-                img: imageData
-            };
+                name: "New Scanned Item", // Laptop will ask for title
+                price: 0,
+                img: capturedImageData
+            });
+            localStorage.setItem('incomingScans', JSON.stringify(incomingScans));
 
-            // Push to shared localStorage so the computer sees it instantly
-            let cart = JSON.parse(localStorage.getItem('shopCart')) || [];
-            cart.push(scannedItem);
-            localStorage.setItem('shopCart', JSON.stringify(cart));
+            document.getElementById('statusText').innerText = "✅ Photo sent to computer!";
+            document.getElementById('snapBtn').style.display = 'none';
 
-            document.getElementById('statusText').innerText = "✅ Sent to computer successfully!";
+            setTimeout(() => {
+                document.getElementById('statusText').innerText = "";
+                document.getElementById('instructionText').innerText = "Waiting for cashier signal...";
+                preview.style.display = 'none';
+            }, 3000);
         };
         reader.readAsDataURL(file);
     }
