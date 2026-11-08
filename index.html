@@ -19,7 +19,7 @@
 
 <div class="box">
     <h2>📱 Phone Scanner</h2>
-    <p id="instructionText">Waiting for cashier signal...</p>
+    <p id="instructionText">Ready to scan products.</p>
     <label class="scan-btn" id="snapBtn" style="display:none;">
         📸 Snap Product Photo
         <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleImage(event)">
@@ -39,10 +39,10 @@
 
 <script>
     const BIN_ID = "6af0c856ffd5d16053b19aac";
-    const API_KEY = "YOUR_JSONBIN_API_KEY"; // <-- REPLACE WITH YOUR JSONBIN MASTER KEY
+    const API_KEY = "$2a$10$kxSBPv9NfutB.zoBny1g.5BjiDXXe6P3mSm/3yebuzo8RXmdYlR6";
 
     let cloudData = {};
-    let lastActionTimestamp = 0;
+    let lastActionTimestamp = localStorage.getItem('lastProcessedAction') || 0;
 
     async function fetchCloud() {
         try {
@@ -54,6 +54,7 @@
 
             if (cloudData.phoneAction && cloudData.phoneAction.timestamp > lastActionTimestamp) {
                 lastActionTimestamp = cloudData.phoneAction.timestamp;
+                localStorage.setItem('lastProcessedAction', lastActionTimestamp);
                 if (cloudData.phoneAction.action === 'add_request') {
                     document.getElementById('addRequestModal').style.display = 'block';
                 }
@@ -97,14 +98,14 @@
             document.getElementById('snapBtn').style.display = 'none';
             setTimeout(() => {
                 document.getElementById('statusText').innerText = "";
-                document.getElementById('instructionText').innerText = "Waiting for cashier signal...";
+                document.getElementById('instructionText').innerText = "Ready to scan products.";
                 preview.style.display = 'none';
             }, 3000);
         };
         reader.readAsDataURL(file);
     }
 
-    setInterval(fetchCloud, 1000);
+    setInterval(fetchCloud, 1500);
     fetchCloud();
 </script>
 </body>
